@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+supervisord-monitor
+supervisord-monitor.exe
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Node modules
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (contains sensitive info)
+config.yaml
+config.yml
+
+# Build artifacts
+frontend/dist/

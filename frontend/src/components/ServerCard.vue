@@ -86,7 +86,12 @@
             <h5 class="modal-title" id="errorModalLabel">
               <i class="bi bi-exclamation-triangle text-danger me-2"></i>{{ errorTitle }}
             </h5>
-            <button type="button" class="btn-close" @click="closeErrorModal"></button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-danger btn-sm" @click="clearErrorLog">
+                <i class="bi bi-trash me-1"></i>Clear Log
+              </button>
+              <button type="button" class="btn-close" @click="closeErrorModal"></button>
+            </div>
           </div>
           <div class="modal-body">
             <div class="bg-light p-3 rounded-3">
@@ -95,9 +100,6 @@
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="closeErrorModal">Close</button>
-            <button class="btn btn-danger" @click="clearErrorLog">
-              <i class="bi bi-trash me-1"></i>Clear Log
-            </button>
           </div>
         </div>
       </div>

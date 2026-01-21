@@ -112,7 +112,8 @@ func GetDashboard(c *gin.Context) {
 
 	log.Printf("=== DEBUG: Starting GetDashboard ===")
 
-	for name, serverCfg := range config.Cfg.SupervisorServers {
+	for _, serverCfg := range config.Cfg.SupervisorServers {
+		name := serverCfg.Name
 		log.Printf("Fetching data for server: %s", name)
 		log.Printf("Server config: URL=%s, HasAuth=%v", serverCfg.URL, serverCfg.Username != "")
 

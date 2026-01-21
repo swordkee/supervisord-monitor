@@ -130,7 +130,7 @@ func (s *SupervisorClient) ClearProcessLogs(name string) error {
 }
 
 func (s *SupervisorClient) ReadProcessStderrLog(name string) (string, error) {
-	return s.client.ReadProcessStderrLog(name, -1000, 0)
+	return s.client.ReadProcessStderrLog(name, -50000, 0)
 }
 
 func (s *SupervisorClient) StartAllProcesses() error {

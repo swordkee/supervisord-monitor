@@ -12,6 +12,7 @@ import (
 var cfgFile string
 
 type SupervisorServer struct {
+	Name     string `mapstructure:"name"`
 	URL      string `mapstructure:"url"`
 	Port     string `mapstructure:"port"`
 	Username string `mapstructure:"username"`
@@ -29,15 +30,15 @@ type HTTPAuthConfig struct {
 }
 
 type Config struct {
-	SupervisorCols    int                         `mapstructure:"supervisor_cols"`
-	Refresh           int                         `mapstructure:"refresh"`
-	EnableAlarm       bool                        `mapstructure:"enable_alarm"`
-	ShowHost          bool                        `mapstructure:"show_host"`
-	Timeout           int                         `mapstructure:"timeout"`
-	Port              int                         `mapstructure:"port"`
-	SupervisorServers map[string]SupervisorServer `mapstructure:"supervisor_servers"`
-	Redmine           RedmineConfig               `mapstructure:"redmine"`
-	HTTPAuth          HTTPAuthConfig              `mapstructure:"http_auth"`
+	SupervisorCols     int                  `mapstructure:"supervisor_cols"`
+	Refresh            int                  `mapstructure:"refresh"`
+	EnableAlarm        bool                 `mapstructure:"enable_alarm"`
+	ShowHost           bool                 `mapstructure:"show_host"`
+	Timeout            int                  `mapstructure:"timeout"`
+	Port               int                  `mapstructure:"port"`
+	SupervisorServers  []SupervisorServer   `mapstructure:"supervisor_servers"`
+	Redmine            RedmineConfig        `mapstructure:"redmine"`
+	HTTPAuth           HTTPAuthConfig       `mapstructure:"http_auth"`
 }
 
 var Cfg *Config
@@ -88,9 +89,27 @@ func LoadConfig(configPath string) error {
 }
 
 func GetServerConfig(serverName string) (*SupervisorServer, error) {
-	server, exists := Cfg.SupervisorServers[serverName]
-	if !exists {
-		return nil, fmt.Errorf("invalid server: %s", serverName)
+	for i := range Cfg.SupervisorServers {
+		if Cfg.SupervisorServers[i].Name == serverName {
+			return &Cfg.SupervisorServers[i], nil
+		}
 	}
-	return &server, nil
+	return nil, fmt.Errorf("invalid server: %s", serverName)
+}
+
+func GetOrderedServerNames() []string {
+	names := make([]string, len(Cfg.SupervisorServers))
+	for i, server := range Cfg.SupervisorServers {
+		names[i] = server.Name
+	}
+	return names
+}
+
+func GetServerByName(name string) *SupervisorServer {
+	for i := range Cfg.SupervisorServers {
+		if Cfg.SupervisorServers[i].Name == name {
+			return &Cfg.SupervisorServers[i]
+		}
+	}
+	return nil
 }

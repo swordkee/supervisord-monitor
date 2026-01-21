@@ -1,93 +1,113 @@
 <template>
-  <div class="server-card">
-    <table class="table table-bordered table-condensed table-striped">
-      <tr>
-        <th colspan="4">
-          <a :href="server.url">{{ server.name }}</a>
-          <i v-if="showHost">{{ hostname }}</i>
-          <i v-if="server.has_auth" class="icon-lock icon-green" style="color:blue" title="Authenticated server connection"></i>
-          &nbsp;<i>{{ server.version }}</i>
-          <span v-if="!server.error" class="server-btns pull-right">
-            <a href="#" @click.prevent="stopAll" class="btn btn-mini btn-inverse" type="button">
-              <i class="icon-stop icon-white"></i> Stop all
-            </a>
-            <a href="#" @click.prevent="startAll" class="btn btn-mini btn-success" type="button">
-              <i class="icon-play icon-white"></i> Start all
-            </a>
-            <a href="#" @click.prevent="restartAll" class="btn btn-mini btn-primary" type="button">
-              <i class="icon icon-refresh icon-white"></i> Restart all
-            </a>
-          </span>
-        </th>
-      </tr>
-      <tr v-if="server.error">
-        <td colspan="4">{{ server.error }}</td>
-      </tr>
-      <tr v-for="process in server.processes" :key="getProcessName(process)">
-        <td>
-          {{ getProcessName(process) }}
-          <span v-if="process.has_error" class="pull-right">
-            <a href="#"
-               :id="`${server.name}_${getProcessName(process)}`"
-               @click.prevent="showError(process)"
-               class="pop btn btn-mini btn-danger">
-              <img src="/img/alert_icon.png" />
-            </a>
-          </span>
-        </td>
-        <td width="10">
-          <span :class="['label', `label-${getStatusClass(process.statename)}`]">
-            {{ process.statename.toUpperCase() }}
-          </span>
-        </td>
-        <td width="80" style="text-align:right">
-          {{ getUptime(process.description) }}
-        </td>
-        <td style="width:1%">
-          <div class="actions">
-            <template v-if="process.statename === 'RUNNING' || process.statename === 'Running'">
-              <a href="#" @click.prevent="stopProcess(process)" class="btn btn-mini btn-inverse" type="button" title="Stop">
-                <i class="icon-stop icon-white"></i>
-              </a>
-              <a href="#" @click.prevent="restartProcess(process)" class="btn btn-mini btn-inverse" type="button" title="Restart">
-                <i class="icon-refresh icon-white"></i>
-              </a>
-            </template>
-            <template v-else-if="['STOPPED', 'STOPPED', 'EXITED', 'Exited', 'FATAL', 'Fatal'].includes(process.statename)">
-              <a href="#" @click.prevent="startProcess(process)" class="btn btn-mini btn-success" type="button" title="Start">
-                <i class="icon-play icon-white"></i>
-              </a>
-            </template>
-            <template v-else>
-              <a href="#" @click.prevent="startProcess(process)" class="btn btn-mini btn-success" type="button" title="Start">
-                <i class="icon-play icon-white"></i>
-              </a>
-            </template>
-          </div>
-        </td>
-      </tr>
-    </table>
-
-    <div class="modal hide fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="errorModalLabel" aria-hidden="true" ref="errorModal">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-hidden="true" @click="closeErrorModal">×</button>
-        <h3 id="errorModalLabel">{{ errorTitle }}</h3>
-      </div>
-      <div class="modal-body">
-        <div class="well" style="padding:20px;">
-          <pre style="white-space:pre-wrap;word-wrap:break-word;">{{ errorMessage }}</pre>
+  <div class="server-card card shadow-sm h-100">
+    <div class="card-header bg-white border-0 py-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 fw-bold">
+            <a :href="server.url" class="text-decoration-none text-dark">{{ server.name }}</a>
+            <small v-if="showHost" class="text-muted ms-2">({{ hostname }})</small>
+            <i v-if="server.has_auth" class="bi bi-shield-lock text-primary ms-2" title="Authenticated server connection"></i>
+            <small class="text-muted ms-2">{{ server.version }}</small>
+          </h5>
+        </div>
+        <div v-if="!server.error" class="btn-group btn-group-sm" role="group">
+          <button @click.prevent="stopAll" class="btn btn-outline-danger" type="button" title="Stop all">
+            <i class="bi bi-stop-circle-fill"></i>
+          </button>
+          <button @click.prevent="startAll" class="btn btn-outline-success" type="button" title="Start all">
+            <i class="bi bi-play-circle-fill"></i>
+          </button>
+          <button @click.prevent="restartAll" class="btn btn-outline-primary" type="button" title="Restart all">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-primary" @click="closeErrorModal">ok</button>
-        <button class="btn btn-danger" @click="clearErrorLog">Clear</button>
+    </div>
+
+    <div class="card-body p-0">
+      <div v-if="server.error" class="alert alert-danger m-3 rounded-3">
+        <i class="bi bi-exclamation-triangle me-2"></i>{{ server.error }}
+      </div>
+
+      <table class="table table-hover table-sm mb-0">
+        <tbody>
+          <tr v-for="process in server.processes" :key="getProcessName(process)" class="align-middle">
+            <td>
+              <span class="fw-medium">{{ getProcessName(process) }}</span>
+              <span v-if="process.has_error" class="float-end">
+                <button
+                  :id="`${server.name}_${getProcessName(process)}`"
+                  @click.prevent="showError(process)"
+                  class="btn btn-sm btn-danger rounded-pill"
+                  title="View error">
+                  <i class="bi bi-exclamation-triangle"></i>
+                </button>
+              </span>
+            </td>
+            <td style="width: 100px;">
+              <span :class="['badge', `bg-${getStatusClass(process.statename)}`]">
+                {{ process.statename.toUpperCase() }}
+              </span>
+            </td>
+            <td style="width: 120px; text-align:right;">
+              <small class="text-muted">{{ getUptime(process.description) }}</small>
+            </td>
+            <td style="width: 100px;">
+              <div class="btn-group btn-group-sm" role="group">
+                <template v-if="process.statename === 'RUNNING' || process.statename === 'Running'">
+                  <button @click.prevent="stopProcess(process)" class="btn btn-outline-dark" type="button" title="Stop">
+                    <i class="bi bi-stop-circle"></i>
+                  </button>
+                  <button @click.prevent="restartProcess(process)" class="btn btn-outline-dark" type="button" title="Restart">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </template>
+                <template v-else-if="['STOPPED', 'STOPPED', 'EXITED', 'Exited', 'FATAL', 'Fatal'].includes(process.statename)">
+                  <button @click.prevent="startProcess(process)" class="btn btn-outline-success" type="button" title="Start">
+                    <i class="bi bi-play-circle"></i>
+                  </button>
+                </template>
+                <template v-else>
+                  <button @click.prevent="startProcess(process)" class="btn btn-outline-success" type="button" title="Start">
+                    <i class="bi bi-play-circle"></i>
+                  </button>
+                </template>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="showModal" class="modal fade show d-block" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="errorModalLabel">
+              <i class="bi bi-exclamation-triangle text-danger me-2"></i>{{ errorTitle }}
+            </h5>
+            <button type="button" class="btn-close" @click="closeErrorModal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="bg-light p-3 rounded-3">
+              <pre class="mb-0 text-wrap" style="white-space:pre-wrap;word-wrap:break-word;">{{ errorMessage }}</pre>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="closeErrorModal">Close</button>
+            <button class="btn btn-danger" @click="clearErrorLog">
+              <i class="bi bi-trash me-1"></i>Clear Log
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+    <div v-if="showModal" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 
 export default {
@@ -113,11 +133,10 @@ export default {
       }
     })
 
-    const errorModal = ref(null)
     const errorTitle = ref('')
     const errorMessage = ref('')
     const currentProcess = ref(null)
-    let $modal = null
+    const showModal = ref(false)
 
     const getProcessName = (process) => {
       if (process.group !== process.name) {
@@ -160,19 +179,15 @@ export default {
     }
 
     const showError = (process) => {
-      currentProcess.value = process
       const processName = getProcessName(process)
-      errorTitle.value = `${processName}@${props.server.name}`
-      errorMessage.value = process.log || ''
-      if ($modal) {
-        $modal.modal('show')
-      }
+      errorTitle.value = `${processName} @ ${props.server.name}`
+      errorMessage.value = process.log || 'No error log available'
+      currentProcess.value = process
+      showModal.value = true
     }
 
     const closeErrorModal = () => {
-      if ($modal) {
-        $modal.modal('hide')
-      }
+      showModal.value = false
       currentProcess.value = null
     }
 
@@ -241,29 +256,15 @@ export default {
     }
 
     const restartAll = () => {
-      executeAction(() => 
+      executeAction(() =>
         axios.post(`/api/restartall/${props.server.name}`)
       )
     }
 
-    onMounted(() => {
-      if (errorModal.value) {
-        $modal = window.$(errorModal.value)
-        $modal.modal({ show: false })
-      }
-    })
-
-    onUnmounted(() => {
-      if ($modal) {
-        $modal.modal('hide')
-        $modal.remove()
-      }
-    })
-
     return {
-      errorModal,
       errorTitle,
       errorMessage,
+      showModal,
       hostname,
       getProcessName,
       getStatusClass,
@@ -284,72 +285,127 @@ export default {
 </script>
 
 <style scoped>
-.server-btns {
-  margin-top: -5px;
+.server-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 20px rgba(0, 0, 0, 0.08);
 }
 
-.server-btns a:not(:last-child) {
-  margin-right: 3px;
+.server-card:hover {
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(99, 102, 241, 0.3);
 }
 
-.table-condensed {
-  font-size: 13px;
-  font-weight: normal;
+.card-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(249, 250, 251, 1) 100%);
 }
 
-.table-condensed td, .table-condensed th {
-  font-weight: normal;
+.card-header h5 a {
+  transition: color 0.2s ease;
+  color: #1f2937;
 }
 
-.btn-mini {
-  padding: 4px 8px;
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: bold;
-  min-width: 20px;
-  display: inline-block;
+.card-header h5 a:hover {
+  color: #6366f1 !important;
 }
 
-.icon-white {
-  color: white !important;
+.btn-group .btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-width: 1.5px;
 }
 
-.label {
-  font-size: 11px;
-  font-weight: bold;
-  padding: 3px 6px;
+.btn-group .btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Bootstrap 2.3 icon fallback */
-[class^="icon-"],
-[class*=" icon-"] {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  line-height: 14px;
-  vertical-align: text-top;
-  background-image: url("https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/2.3.2/img/glyphicons-halflings.png");
-  background-position: 14px 14px;
-  background-repeat: no-repeat;
+.btn-group .btn:active {
+  transform: scale(0.95);
 }
 
-.icon-white {
-  background-image: url("https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/2.3.2/img/glyphicons-halflings-white.png");
+.table {
+  margin-bottom: 0;
 }
 
-.icon-stop {
-  background-position: -312px 0;
+.table tbody tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
-.icon-play {
-  background-position: -264px 0;
+.table tbody tr:last-child {
+  border-bottom: none;
 }
 
-.icon-refresh {
-  background-position: -240px 0;
+.table tbody tr:hover {
+  background-color: rgba(99, 102, 241, 0.04);
+  transform: translateX(4px);
 }
 
-.icon-lock {
-  background-position: -24px 0;
+.badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.4em 0.7em;
+  border-radius: 8px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.modal-content {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 1.5rem 2rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(249, 250, 251, 1) 100%);
+}
+
+.modal-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 1.5rem 2rem;
+  background: #f9fafb;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.modal-body pre {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: #374151;
+  background: #f3f4f6;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.alert {
+  border-radius: 14px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .server-card:hover {
+    transform: none;
+  }
 }
 </style>

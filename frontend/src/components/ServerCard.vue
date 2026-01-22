@@ -29,30 +29,26 @@
         <i class="bi bi-exclamation-triangle me-2"></i>{{ server.error }}
       </div>
 
-      <table class="table table-hover table-sm mb-0">
-        <tbody>
-          <tr v-for="process in server.processes" :key="getProcessName(process)" class="align-middle">
-            <td>
-              <span class="fw-medium">{{ getProcessName(process) }}</span>
-              <span v-if="process.has_error" class="float-end">
+      <div class="process-list">
+        <div v-for="process in server.processes" :key="getProcessName(process)" class="process-item">
+          <div class="process-row">
+            <div class="process-main">
+              <span class="process-name fw-medium">{{ getProcessName(process) }}</span>
+              <span v-if="process.has_error" class="ms-2 error-btn-wrapper">
                 <button
                   :id="`${server.name}_${getProcessName(process)}`"
                   @click.prevent="showError(process)"
-                  class="btn btn-sm btn-danger rounded-pill"
+                  class="btn btn-sm btn-danger rounded-pill p-1"
                   title="View error">
-                  <i class="bi bi-exclamation-triangle"></i>
+                  <i class="bi bi-exclamation-triangle small"></i>
                 </button>
               </span>
-            </td>
-            <td style="width: 100px;">
+            </div>
+            <div class="process-actions">
               <span :class="['badge', `bg-${getStatusClass(process.statename)}`]">
                 {{ process.statename.toUpperCase() }}
               </span>
-            </td>
-            <td style="width: 120px; text-align:right;">
-              <small class="text-muted">{{ getUptime(process.description) }}</small>
-            </td>
-            <td style="width: 100px;">
+              <small class="text-muted uptime-text">{{ getUptime(process.description) }}</small>
               <div class="btn-group btn-group-sm" role="group">
                 <template v-if="process.statename === 'RUNNING' || process.statename === 'Running'">
                   <button @click.prevent="stopProcess(process)" class="btn btn-outline-dark" type="button" title="Stop">
@@ -73,10 +69,10 @@
                   </button>
                 </template>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="showModal" class="modal fade show d-block" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
@@ -331,39 +327,87 @@ export default {
   transform: scale(0.95);
 }
 
-.table {
+/* 进程列表布局 */
+.process-list {
   margin-bottom: 0;
 }
 
-.table tbody tr {
-  transition: all 0.2s ease;
+.process-item {
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
-.table tbody tr:last-child {
+.process-item:last-child {
   border-bottom: none;
 }
 
-.table tbody tr:hover {
+.process-item:hover {
   background-color: rgba(99, 102, 241, 0.04);
-  transform: translateX(4px);
+}
+
+.process-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.process-main {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.process-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.error-btn-wrapper {
+  flex-shrink: 0;
+}
+
+.process-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.uptime-text {
+  font-size: 0.75rem;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  padding: 0.4em 0.7em;
-  border-radius: 8px;
-  letter-spacing: 0.5px;
+  padding: 0.35em 0.6em;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-sm {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.8rem;
-  border-radius: 10px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
   font-weight: 600;
+}
+
+.btn-sm i {
+  font-size: 0.9rem;
 }
 
 .modal-content {
@@ -405,9 +449,36 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+/* 手机端适配 */
 @media (max-width: 768px) {
   .server-card:hover {
     transform: none;
+  }
+
+  .process-item {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .process-row {
+    gap: 0.5rem;
+  }
+
+  .process-name {
+    font-size: 0.85rem;
+  }
+
+  .uptime-text {
+    display: none !important;
+  }
+
+  .badge {
+    font-size: 0.6rem;
+    padding: 0.25em 0.5em;
+  }
+
+  .btn-group-sm > .btn {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
   }
 }
 </style>

@@ -13,6 +13,11 @@
             <li class="nav-item">
               <a class="nav-link active" href="/">Home</a>
             </li>
+            <li class="nav-item" v-if="currentUser">
+              <span class="nav-link">
+                <i class="bi bi-person-circle me-1"></i>{{ currentUser }}
+              </span>
+            </li>
             <li class="nav-item">
               <a class="nav-link" href="#" @click="toggleMute">
                 <i :class="['bi', muted ? 'bi-volume-mute' : 'bi-volume-up']"></i>
@@ -40,6 +45,10 @@
         <a href="#" @click="toggleMute" class="btn btn-sm btn-warning">
           <i class="bi bi-volume-up me-1"></i> Unmute
         </a>
+      </div>
+
+      <div v-if="currentUser && servers.length === 0" class="alert alert-info shadow-sm">
+        <i class="bi bi-info-circle me-2"></i>当前账号没有可访问的监控服务器，请联系管理员分配监控组。
       </div>
 
       <div class="row g-4">
@@ -77,6 +86,7 @@ export default {
     const refreshIntervalSeconds = ref(10)
     const enableAlarm = ref(true)
     const hasUserInteracted = ref(false)
+    const currentUser = ref('')
 
     const hasAlert = computed(() => {
       return servers.value.some(server =>
@@ -91,6 +101,7 @@ export default {
         supervisorCols.value = response.data.supervisor_cols
         showHost.value = response.data.show_host
         enableAlarm.value = response.data.enable_alarm
+        currentUser.value = response.data.user || ''
         refreshTimer.value = 0  // 不自动刷新
 
         if (hasAlert.value && !muted.value && enableAlarm.value && hasUserInteracted.value) {
@@ -172,6 +183,7 @@ export default {
       alertSound,
       supervisorCols,
       showHost,
+      currentUser,
       refresh,
       toggleMute
     }

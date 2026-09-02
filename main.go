@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/subtle"
 	"flag"
 	"fmt"
 	"log"
@@ -32,7 +31,7 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(handlers.LoggerMiddleware())
 
-	if config.Cfg.HTTPAuth.Username != "" && config.Cfg.HTTPAuth.Password != "" {
+	if config.Cfg.AuthEnabled() {
 		r.Use(BasicAuthMiddleware())
 	}
 
@@ -50,13 +49,18 @@ func BasicAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, pass, hasAuth := c.Request.BasicAuth()
 
-		if !hasAuth || subtle.ConstantTimeCompare([]byte(user), []byte(config.Cfg.HTTPAuth.Username)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(pass), []byte(config.Cfg.HTTPAuth.Password)) != 1 {
+		var principal *config.AuthPrincipal
+		if hasAuth {
+			principal = config.Cfg.Authenticate(user, pass)
+		}
+
+		if principal == nil {
 			c.Header("WWW-Authenticate", `Basic realm="Restricted"`)
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
+		c.Set(handlers.PrincipalContextKey, principal)
 		c.Next()
 	}
 }

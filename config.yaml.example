@@ -1,0 +1,100 @@
+# Supervisord Monitor 配置文件示例
+# 复制为 config.yaml 并根据实际情况修改
+
+supervisor_cols: 2      # 仪表盘列数 (2 或 3)
+refresh: 10             # 自动刷新间隔(秒), 0 表示禁用
+enable_alarm: true      # 启用/禁用告警声音
+show_host: false        # 在服务器名称后显示主机名
+timeout: 3              # RPC2 接口连接超时(秒)
+port: 8080              # Web 服务端口
+
+# 监控组定义 - 将多个服务器归类为一组，便于批量授权
+monitor_groups:
+  - name: "production"
+    servers:
+      - "server01"
+      - "server02"
+  - name: "staging"
+    servers:
+      - "server03"
+  - name: "development"
+    servers:
+      - "server04"
+      - "server05"
+
+# Web 界面 HTTP Basic 认证配置
+# 支持两种配置方式，可同时使用：
+#
+# 1. 传统单账号模式 (管理员账号，可访问所有服务器)
+#    保留向后兼容，适合个人使用或管理员
+http_auth:
+  username: "admin"
+  password: "admin123"
+
+  # 2. 多账号模式 (不同账号访问不同监控组)
+  #    每个账号可通过 groups 或 servers 字段指定可访问范围
+  #    使用 "*" 表示可访问所有服务器
+  users:
+    # 生产环境运维 - 只能访问生产组
+    - username: "ops_prod"
+      password: "prod_pass_123"
+      groups:
+        - "production"
+
+    # 测试环境运维 - 只能访问测试组
+    - username: "ops_staging"
+      password: "staging_pass_123"
+      groups:
+        - "staging"
+
+    # 开发团队 - 可访问开发组
+    - username: "dev_team"
+      password: "dev_pass_123"
+      groups:
+        - "development"
+
+    # 项目经理 - 可访问生产和测试环境
+    - username: "pm"
+      password: "pm_pass_123"
+      groups:
+        - "production"
+        - "staging"
+
+    # 实习生 - 只能访问特定服务器
+    - username: "intern"
+      password: "intern_pass_123"
+      servers:
+        - "server04"
+
+    # 超级管理员 - 可访问所有服务器
+    - username: "superadmin"
+      password: "super_pass_123"
+      groups:
+        - "*"
+
+# Supervisord 服务器列表
+supervisor_servers:
+  - name: "server01"
+    url: "http://server01.app/RPC2"
+    port: "9001"
+    username: "yourusername"
+    password: "yourpass"
+  - name: "server02"
+    url: "http://server02.app/RPC2"
+    port: "9001"
+    username: "yourusername"
+    password: "yourpass"
+  - name: "server03"
+    url: "http://server03.app/RPC2"
+    port: "9001"
+  - name: "server04"
+    url: "http://server04.app/RPC2"
+    port: "9001"
+  - name: "server05"
+    url: "http://server05.app/RPC2"
+    port: "9001"
+
+# Redmine 集成配置 (可选)
+redmine:
+  url: ""
+  assignee_id: ""

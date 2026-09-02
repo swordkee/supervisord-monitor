@@ -11,7 +11,7 @@ A multi-server Supervisord monitoring tool built with Gin + Vue, with all static
 - 🔇 Mute function (using browser local storage)
 - 🔄 Auto-refresh page (configurable)
 - 🔐 Support for authenticated and non-authenticated Supervisord servers
-- 🔒 Web interface HTTP Basic Authentication (optional)
+- 🔒 Web interface HTTP Basic Authentication (optional, with multi-user group-based authorization)
 - 📦 Single executable file, no additional deployment required
 - ⚡ High-performance Go backend + Vue 3 frontend
 
@@ -85,11 +85,38 @@ show_host: false        # Show hostname after server name
 timeout: 3              # RPC2 interface connection timeout (seconds)
 port: 8080              # Web service port
 
-# Web interface HTTP Basic Authentication (optional)
-# Leave empty to disable authentication
+# Monitor groups - group multiple servers for easy authorization
+monitor_groups:
+  - name: "production"
+    servers:
+      - "server01"
+      - "server02"
+  - name: "staging"
+    servers:
+      - "server03"
+
+# Web interface HTTP Basic Authentication
 http_auth:
-  username: "admin"     # Login username
-  password: "admin123"  # Login password
+  # Legacy admin account (access to all servers)
+  username: "admin"
+  password: "admin123"
+
+  # Multi-user configuration - different users access different groups
+  users:
+    - username: "ops_prod"
+      password: "prod_pass"
+      groups:
+        - "production"    # Can only access production group
+
+    - username: "dev_team"
+      password: "dev_pass"
+      servers:
+        - "server03"      # Can only access specific server
+
+    - username: "superadmin"
+      password: "super_pass"
+      groups:
+        - "*"             # "*" means access to all servers
 
 supervisor_servers:
   - name: "server01"
@@ -100,7 +127,14 @@ supervisor_servers:
   - name: "server02"
     url: "http://server02.app/RPC2"
     port: "9001"
+    username: "yourusername"
+    password: "yourpass"
+  - name: "server03"
+    url: "http://server03.app/RPC2"
+    port: "9001"
 ```
+
+See `config.yaml.example` for a complete configuration example.
 
 ## Usage
 
@@ -134,14 +168,77 @@ supervisord-monitor.exe -config config.yaml -port 8080
 
 Default access: `http://localhost:8080`
 
-### HTTP Authentication
+## HTTP Authentication & Authorization
 
-If `http_auth` is configured in `config.yaml`, a login dialog will appear:
+### Authentication Modes
 
-- Username: `http_auth.username` from config
-- Password: `http_auth.password` from config
+The system supports two authentication configuration methods, which can be used simultaneously:
 
-To disable authentication, leave `username` and `password` empty.
+1. **Legacy Single-Account Mode** (`http_auth.username` / `http_auth.password`)
+   - Suitable for personal use or administrators
+   - Access to all servers
+   - Backward compatible
+
+2. **Multi-User Group Authorization Mode** (`http_auth.users`)
+   - Different users can access different monitor groups or servers
+   - Suitable for team collaboration and permission separation
+
+### Authorization Rules
+
+Each user account can specify access permissions via the following fields:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `groups` | List of accessible monitor groups | `["production", "staging"]` |
+| `servers` | List of accessible specific servers | `["server01", "server02"]` |
+| `"*"` | Wildcard, means access to all servers | `groups: ["*"]` |
+
+**Permission Calculation Logic:**
+- `groups` and `servers` fields are combined with "OR" logic
+- Using `"*"` wildcard grants access to all servers
+- When `users` is not configured, only the legacy admin account takes effect
+
+### Monitor Group Configuration
+
+Use `monitor_groups` to categorize multiple servers into a group:
+
+```yaml
+monitor_groups:
+  - name: "production"
+    servers:
+      - "server01"
+      - "server02"
+  - name: "staging"
+    servers:
+      - "server03"
+```
+
+Then reference the group name in user configuration:
+
+```yaml
+http_auth:
+  users:
+    - username: "ops"
+      password: "pass123"
+      groups:
+        - "production"    # Can access server01, server02
+```
+
+### Permission Verification
+
+- **Dashboard Data**: Only returns servers the user has permission to access
+- **Process Control APIs**: Operations on unauthorized servers return `403 Forbidden`
+- **Frontend Display**: Navigation bar shows the current logged-in username
+
+### Disable Authentication
+
+Leave `http_auth.username` and `http_auth.password` empty, and do not configure `users`:
+
+```yaml
+http_auth:
+  username: ""
+  password: ""
+```
 
 ## Features
 
@@ -188,6 +285,19 @@ To disable authentication, leave `username` and `password` empty.
 GET /api/dashboard?mute=1
 ```
 
+Response example:
+```json
+{
+  "servers": [...],
+  "refresh": 10,
+  "enable_alarm": true,
+  "supervisor_cols": 2,
+  "show_host": false,
+  "muted": false,
+  "user": "ops_prod"
+}
+```
+
 ### Process Control
 
 ```
@@ -199,6 +309,8 @@ POST /api/startall/{server}
 POST /api/stopall/{server}
 POST /api/restartall/{server}
 ```
+
+**Permission Note**: All control APIs verify whether the current user has access to the target server. Returns `403 Forbidden` when unauthorized.
 
 ## Troubleshooting
 
@@ -212,6 +324,11 @@ POST /api/restartall/{server}
 
 - Incorrect username or password
 - Check authentication info in config file
+
+### "403 Forbidden"
+
+- Current account does not have permission to access this server
+- Contact administrator to assign monitor groups or server permissions
 
 ### "UNKNOWN_METHOD"
 
@@ -258,9 +375,9 @@ Access `http://localhost:8080`
 ```
 supervisord-monitor-go/
 ├── config/
-│   └── config.go          # Configuration management
+│   └── config.go          # Configuration management (with auth logic)
 ├── handlers/
-│   └── handlers.go        # API handlers
+│   └── handlers.go        # API handlers (with permission verification)
 ├── services/
 │   └── supervisord.go     # Supervisord XML-RPC client
 ├── embed.go               # Static file embedding
@@ -277,7 +394,7 @@ supervisord-monitor-go/
 │   └── vite.config.js     # Vite configuration
 ├── sounds/
 │   └── alert.mp3          # Alert sound
-├── config.yaml            # Configuration file
+├── config.yaml.example    # Configuration example
 ├── build.bat              # Windows build script
 └── build.sh               # Linux/Mac build script
 ```

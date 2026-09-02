@@ -12,6 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// PrincipalContextKey is the gin context key under which the authenticated
+// principal is stored by the auth middleware.
+const PrincipalContextKey = "auth_principal"
+
 type ProcessWithLog struct {
 	services.ProcessInfo
 	Log      string `json:"log"`
@@ -79,6 +83,7 @@ type DashboardResponse struct {
 	SupervisorCols int          `json:"supervisor_cols"`
 	ShowHost       bool         `json:"show_host"`
 	Muted          bool         `json:"muted"`
+	User           string       `json:"user,omitempty"`
 }
 
 func (r DashboardResponse) MarshalJSON() ([]byte, error) {
@@ -89,6 +94,7 @@ func (r DashboardResponse) MarshalJSON() ([]byte, error) {
 		SupervisorCols int          `json:"supervisor_cols"`
 		ShowHost       bool         `json:"show_host"`
 		Muted          bool         `json:"muted"`
+		User           string       `json:"user,omitempty"`
 	}{
 		Servers:        r.Servers,
 		Refresh:        r.Refresh,
@@ -96,7 +102,43 @@ func (r DashboardResponse) MarshalJSON() ([]byte, error) {
 		SupervisorCols: r.SupervisorCols,
 		ShowHost:       r.ShowHost,
 		Muted:          r.Muted,
+		User:           r.User,
 	})
+}
+
+// getPrincipal returns the authenticated principal stored by the auth
+// middleware, or nil when authentication is disabled.
+func getPrincipal(c *gin.Context) *config.AuthPrincipal {
+	value, exists := c.Get(PrincipalContextKey)
+	if !exists {
+		return nil
+	}
+	principal, _ := value.(*config.AuthPrincipal)
+	return principal
+}
+
+// canAccessServer reports whether the current request is allowed to see and
+// control the given supervisor server. A nil principal (auth disabled) or a
+// principal with no server restriction (legacy admin account) may access all
+// servers.
+func canAccessServer(c *gin.Context, server string) bool {
+	principal := getPrincipal(c)
+	if principal == nil || principal.AllowedServers == nil {
+		return true
+	}
+	return principal.AllowedServers[server]
+}
+
+// authorizeServer reads the :server route parameter and ensures the current
+// principal may access it. It writes the error response and returns false when
+// access is denied.
+func authorizeServer(c *gin.Context) (string, bool) {
+	server := c.Param("server")
+	if !canAccessServer(c, server) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden: no access to server " + server})
+		return "", false
+	}
+	return server, true
 }
 
 func GetDashboard(c *gin.Context) {
@@ -110,9 +152,18 @@ func GetDashboard(c *gin.Context) {
 		Muted:          muted,
 	}
 
+	if principal := getPrincipal(c); principal != nil {
+		response.User = principal.Username
+	}
+
 	log.Printf("=== DEBUG: Starting GetDashboard ===")
 
 	for _, serverCfg := range config.Cfg.SupervisorServers {
+		if !canAccessServer(c, serverCfg.Name) {
+			log.Printf("Skipping server %s: not authorized for this account", serverCfg.Name)
+			continue
+		}
+
 		name := serverCfg.Name
 		log.Printf("Fetching data for server: %s", name)
 		log.Printf("Server config: URL=%s, HasAuth=%v", serverCfg.URL, serverCfg.Username != "")
@@ -187,7 +238,10 @@ func GetDashboard(c *gin.Context) {
 }
 
 func StartProcess(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 	worker := c.Param("worker")
 
 	client, err := services.NewSupervisorClient(server)
@@ -205,7 +259,10 @@ func StartProcess(c *gin.Context) {
 }
 
 func StopProcess(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 	worker := c.Param("worker")
 
 	client, err := services.NewSupervisorClient(server)
@@ -223,7 +280,10 @@ func StopProcess(c *gin.Context) {
 }
 
 func RestartProcess(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 	worker := c.Param("worker")
 
 	client, err := services.NewSupervisorClient(server)
@@ -241,7 +301,10 @@ func RestartProcess(c *gin.Context) {
 }
 
 func ClearProcessLog(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 	worker := c.Param("worker")
 
 	client, err := services.NewSupervisorClient(server)
@@ -259,7 +322,10 @@ func ClearProcessLog(c *gin.Context) {
 }
 
 func StartAllProcesses(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 
 	client, err := services.NewSupervisorClient(server)
 	if err != nil {
@@ -276,7 +342,10 @@ func StartAllProcesses(c *gin.Context) {
 }
 
 func StopAllProcesses(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 
 	client, err := services.NewSupervisorClient(server)
 	if err != nil {
@@ -293,7 +362,10 @@ func StopAllProcesses(c *gin.Context) {
 }
 
 func RestartAllProcesses(c *gin.Context) {
-	server := c.Param("server")
+	server, ok := authorizeServer(c)
+	if !ok {
+		return
+	}
 
 	client, err := services.NewSupervisorClient(server)
 	if err != nil {

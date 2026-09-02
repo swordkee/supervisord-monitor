@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"log"
 	"os"
@@ -24,21 +25,48 @@ type RedmineConfig struct {
 	AssigneeID string `mapstructure:"assignee_id"`
 }
 
+// MonitorGroup is a named collection of supervisor servers that can be
+// granted to web users as a unit.
+type MonitorGroup struct {
+	Name    string   `mapstructure:"name"`
+	Servers []string `mapstructure:"servers"`
+}
+
+// AuthUser is a web interface login account. Access is derived from the
+// listed monitor groups and/or explicit server names. A "*" entry in either
+// field grants access to every server.
+type AuthUser struct {
+	Username string   `mapstructure:"username"`
+	Password string   `mapstructure:"password"`
+	Groups   []string `mapstructure:"groups"`
+	Servers  []string `mapstructure:"servers"`
+}
+
 type HTTPAuthConfig struct {
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
+	Username string     `mapstructure:"username"`
+	Password string     `mapstructure:"password"`
+	Users    []AuthUser `mapstructure:"users"`
+}
+
+// AuthPrincipal represents an authenticated web user and the set of servers
+// it is allowed to see and control. A nil AllowedServers map means the user
+// may access every configured server.
+type AuthPrincipal struct {
+	Username       string
+	AllowedServers map[string]bool
 }
 
 type Config struct {
-	SupervisorCols     int                  `mapstructure:"supervisor_cols"`
-	Refresh            int                  `mapstructure:"refresh"`
-	EnableAlarm        bool                 `mapstructure:"enable_alarm"`
-	ShowHost           bool                 `mapstructure:"show_host"`
-	Timeout            int                  `mapstructure:"timeout"`
-	Port               int                  `mapstructure:"port"`
-	SupervisorServers  []SupervisorServer   `mapstructure:"supervisor_servers"`
-	Redmine            RedmineConfig        `mapstructure:"redmine"`
-	HTTPAuth           HTTPAuthConfig       `mapstructure:"http_auth"`
+	SupervisorCols    int                `mapstructure:"supervisor_cols"`
+	Refresh           int                `mapstructure:"refresh"`
+	EnableAlarm       bool               `mapstructure:"enable_alarm"`
+	ShowHost          bool               `mapstructure:"show_host"`
+	Timeout           int                `mapstructure:"timeout"`
+	Port              int                `mapstructure:"port"`
+	SupervisorServers []SupervisorServer `mapstructure:"supervisor_servers"`
+	Redmine           RedmineConfig      `mapstructure:"redmine"`
+	MonitorGroups     []MonitorGroup     `mapstructure:"monitor_groups"`
+	HTTPAuth          HTTPAuthConfig     `mapstructure:"http_auth"`
 }
 
 var Cfg *Config
@@ -83,6 +111,77 @@ func LoadConfig(configPath string) error {
 	Cfg = &Config{}
 	if err := viper.Unmarshal(Cfg); err != nil {
 		return fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return nil
+}
+
+// AuthEnabled reports whether web interface authentication is configured.
+func (c *Config) AuthEnabled() bool {
+	return (c.HTTPAuth.Username != "" && c.HTTPAuth.Password != "") || len(c.HTTPAuth.Users) > 0
+}
+
+// Authenticate validates web interface credentials and returns the principal
+// describing which servers the account may access. It returns nil when the
+// credentials do not match any configured account.
+func (c *Config) Authenticate(username, password string) *AuthPrincipal {
+	groupServers := make(map[string][]string, len(c.MonitorGroups))
+	for i := range c.MonitorGroups {
+		group := &c.MonitorGroups[i]
+		groupServers[group.Name] = group.Servers
+	}
+
+	// Legacy single-account configuration: grants access to every server.
+	if c.HTTPAuth.Username != "" && c.HTTPAuth.Password != "" {
+		userOK := subtle.ConstantTimeCompare([]byte(username), []byte(c.HTTPAuth.Username)) == 1
+		passOK := subtle.ConstantTimeCompare([]byte(password), []byte(c.HTTPAuth.Password)) == 1
+		if userOK && passOK {
+			return &AuthPrincipal{Username: c.HTTPAuth.Username, AllowedServers: nil}
+		}
+	}
+
+	for i := range c.HTTPAuth.Users {
+		user := &c.HTTPAuth.Users[i]
+		if user.Username == "" || user.Password == "" {
+			continue
+		}
+
+		userOK := subtle.ConstantTimeCompare([]byte(username), []byte(user.Username)) == 1
+		passOK := subtle.ConstantTimeCompare([]byte(password), []byte(user.Password)) == 1
+		if !userOK || !passOK {
+			continue
+		}
+
+		principal := &AuthPrincipal{Username: user.Username}
+		allowed := make(map[string]bool)
+		grantsAll := false
+
+		for _, groupName := range user.Groups {
+			if groupName == "*" {
+				grantsAll = true
+				break
+			}
+			for _, srv := range groupServers[groupName] {
+				allowed[srv] = true
+			}
+		}
+
+		if !grantsAll {
+			for _, srv := range user.Servers {
+				if srv == "*" {
+					grantsAll = true
+					break
+				}
+				allowed[srv] = true
+			}
+		}
+
+		if grantsAll {
+			principal.AllowedServers = nil
+		} else {
+			principal.AllowedServers = allowed
+		}
+		return principal
 	}
 
 	return nil
